@@ -42,7 +42,7 @@ Where:
 When `λ = 0`, the algorithm degenerates to pure Nearest Neighbour.
 When `λ > 0`, the algorithm favours cities that are *in front* over cities that are nearby but off-axis.
 
-![image](graph overview.jpeg)
+![image](graph_overview.jpeg)
 ### 2.2 Key Implementation Details
 
 | Component | Description |
