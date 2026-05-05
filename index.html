@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Ray TSP — Fixed v2</title>
+<style>
+/* Reset & Base */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background: #0a0a0a; 
+    color: #b0b0b0; 
+    padding: 24px; 
+    font-size: 12px; 
+    line-height: 1.5;
+}
+
+/* Typography */
+h1 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; letter-spacing: -0.5px; }
+.sub { font-size: 11px; color: #ffffff; margin-bottom: 24px; }
+.panel-title { 
+    font-size: 9px; font-weight: 700; color: #ffffff; 
+    margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1.5px; 
+}
+
+/* Layout */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+.panel { background: #0f0f0f; border: 1px solid #1a1a1a; border-radius: 8px; padding: 16px; }
+
+/* UI Elements */
+canvas { display: block; width: 100%; border-radius: 4px; background: #0a0a0a; border: 1px solid #1a1a1a; }
+
+button {
+    padding: 6px 12px; border-radius: 4px; border: 1px solid #222;
+    background: #141414; color: #888; cursor: pointer; font-size: 11px;
+    transition: all 0.2s ease;
+}
+button:hover { border-color: #333; color: #eee; }
+button.go { background: #0a4d38; color: #6ee7b7; border-color: #107555; }
+button.go:hover { background: #0d664a; color: #fff; }
+button.active { border-color: #1D9E75; color: #1D9E75; background: #04261b; }
+
+input, select {
+    background: #0f0f0f; border: 1px solid #222; color: #aaa;
+    padding: 4px 8px; border-radius: 4px; font-family: inherit;
+}
+
+/* Data Tables */
+#results-table, #hist-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+#results-table th, #hist-table th { 
+    padding: 8px; color: #444; font-weight: 600; border-bottom: 1px solid #1a1a1a; 
+}
+#results-table td, #hist-table td { padding: 8px; text-align: center; border-bottom: 1px solid #121212; }
+tr:hover td { background: #0e0e0e; }
+
+/* Stats & Badges */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.stat { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; padding: 12px; text-align: center; }
+.stat-val { font-size: 16px; font-weight: 700; color: #eee; margin-bottom: 4px; }
+.stat-lbl { font-size: 9px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.progress { height: 4px; background: #1a1a1a; border-radius: 2px; margin: 12px 0; overflow: hidden; }
+.progress-fill { height: 100%; background: #1D9E75; }
+
+.fixes-bar { 
+    background: #0a0a0a; border: 1px solid #1a2a22; border-radius: 6px; 
+    padding: 12px; margin-bottom: 16px; 
+}
+
+/* Utilities */
+.row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+.teal { color: #1D9E75; }
+.amber { color: #BA7517; }
+</style>
+</head>
+<body>
+
+<h1>RAY TSP — FIXED v2</h1>
+<div class="sub">الـ fixes المطبقة: Fix1 angle-weighted score · Fix2 dir update · Fix3 raw comparison (no 2-opt)</div>
+
+<div class="grid">
+  <div>
+    <div class="panel-title">الخريطة الحالية</div>
+    <canvas id="cv" height="280"></canvas>
+    <div class="legend" style="margin-top:6px">
+      <span><span class="dot" style="background:#1D9E75"></span>Ray TSP (fixed)</span>
+      <span><span class="dot" style="background:#BA7517"></span>NN</span>
+    </div>
+    <div id="live-costs" style="font-size:10px;color:#555;margin-top:4px;text-align:center"></div>
+  </div>
+  <div>
+    <div class="panel-title">الإعدادات</div>
+    <div class="panel" style="height:100%">
+
+      <!-- Fix toggles -->
+      <div class="fixes-bar">
+        <div style="color:#ffffff;font-size:9px;letter-spacing:1px;margin-bottom:4px">ACTIVE FIXES</div>
+        <div class="row" style="gap:12px;margin:0">
+          <label style="cursor:pointer;color:#9FE1CB">
+            <input type="checkbox" id="fix1" checked onchange="updateFixLabels()"> Fix1: angle-weighted score
+          </label>
+          <label style="cursor:pointer;color:#9FE1CB">
+            <input type="checkbox" id="fix2" checked onchange="updateFixLabels()"> Fix2: dir update
+          </label>
+        </div>
+        <div class="row" style="margin:4px 0 0">
+          <span style="color:#ffffff;font-size:9px">λ (angle penalty):</span>
+          <input type="range" id="lambda" min="0" max="3" step="0.1" value="1.2" style="width:80px" oninput="document.getElementById('lv').textContent=this.value">
+          <span id="lv" style="color:#1D9E75;font-size:10px">1.2</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="btn-random" class="active" onclick="setMode('random')">RANDOM</button>
+        <button id="btn-cluster" onclick="setMode('cluster')">CLUSTERED</button>
+        <button id="btn-grid" onclick="setMode('grid')">GRID</button>
+      </div>
+
+      <div class="row" id="cluster-ctrl" style="display:none">
+        <span style="color:#555;font-size:10px">clusters:</span>
+        <select id="nClusters"><option>2</option><option>3</option><option selected>4</option><option>5</option></select>
+        <span style="color:#555;font-size:10px">spread:</span>
+        <select id="spread"><option value="30">tight</option><option value="55" selected>medium</option><option value="80">loose</option></select>
+      </div>
+
+      <div class="row">
+        <span style="color:#555;font-size:10px">n=</span>
+        <input id="nIn" type="number" value="12" min="6" max="20" style="width:50px">
+        <button onclick="genCities()">GEN</button>
+        <button onclick="runBoth()">RUN BOTH</button>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #1e1e1e;margin:10px 0">
+
+      <div style="color:#ffffff;font-size:10px;letter-spacing:1px;margin-bottom:4px">BENCHMARK — 100 trials</div>
+      <div style="color:#ffffff;font-size:9px;margin-bottom:6px">Fix3: يقارن RAW + 2opt معاً في نفس الوقت</div>
+      <div class="row">
+        <button class="go" onclick="runBenchmark('random')" id="b-rand">▶ RANDOM ×100</button>
+        <button class="go" onclick="runBenchmark('cluster')" id="b-clust" style="background:#854F0B;border-color:#854F0B">▶ CLUSTER ×100</button>
+      </div>
+      <div class="progress"><div class="progress-fill" id="pf" style="width:0%"></div></div>
+      <div id="bench-status" style="font-size:10px;color:#555;min-height:14px"></div>
+
+      <div class="stat-grid" id="stats-raw">
+        <div class="stat"><div class="stat-val gray">—</div><div class="stat-lbl">Ray wins (raw)</div></div>
+        <div class="stat"><div class="stat-val gray">—</div><div class="stat-lbl">NN wins (raw)</div></div>
+        <div class="stat"><div class="stat-val gray">—</div><div class="stat-lbl">Ray wins (2opt)</div></div>
+        <div class="stat"><div class="stat-val gray">—</div><div class="stat-lbl">avg gap raw%</div></div>
+      </div>
+
+      <div id="finding" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Fix3: dual table — raw AND 2opt -->
+<div class="panel" style="margin-bottom:12px">
+  <div class="panel-title">Fix3 — مقارنة RAW (بدون 2-opt) vs بعد 2-opt</div>
+  <div style="overflow-x:auto">
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th>Dist</th>
+          <th>Trials</th>
+          <th colspan="3" style="border-bottom:1px solid #1D9E7544;color:#1D9E75">RAW (بدون 2-opt)</th>
+          <th colspan="3" style="border-bottom:1px solid #BA751744;color:#BA7517">بعد 2-opt</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th style="color:#1D9E75">Ray wins</th>
+          <th style="color:#1D9E75">NN wins</th>
+          <th style="color:#1D9E75">gap%</th>
+          <th style="color:#BA7517">Ray wins</th>
+          <th style="color:#BA7517">NN wins</th>
+          <th style="color:#BA7517">gap%</th>
+        </tr>
+      </thead>
+      <tbody id="results-body">
+        <tr><td colspan="8" style="color:#333;padding:12px">— شغّل benchmark —</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- History -->
+<div class="panel">
+  <div class="panel-title">تاريخ آخر 20 تجربة — RAW vs 2opt</div>
+  <div style="overflow-x:auto">
+    <table id="hist-table" style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead>
+        <tr>
+          <th style="text-align:center;padding:3px 6px;color:#555;border-bottom:1px solid #222">#</th>
+          <th style="text-align:center;padding:3px 6px;color:#555;border-bottom:1px solid #222">Dist</th>
+          <th style="text-align:center;padding:3px 6px;color:#1D9E75;border-bottom:1px solid #222">Ray raw</th>
+          <th style="text-align:center;padding:3px 6px;color:#1D9E75;border-bottom:1px solid #222">NN raw</th>
+          <th style="text-align:center;padding:3px 6px;color:#1D9E75;border-bottom:1px solid #222">Win (raw)</th>
+          <th style="text-align:center;padding:3px 6px;color:#BA7517;border-bottom:1px solid #222">Ray 2opt</th>
+          <th style="text-align:center;padding:3px 6px;color:#BA7517;border-bottom:1px solid #222">NN 2opt</th>
+          <th style="text-align:center;padding:3px 6px;color:#BA7517;border-bottom:1px solid #222">Win (2opt)</th>
+          <th style="text-align:center;padding:3px 6px;color:#555;border-bottom:1px solid #222">gap raw%</th>
+        </tr>
+      </thead>
+      <tbody id="hist-body">
+        <tr><td colspan="9" style="color:#333;padding:8px;text-align:center">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
