@@ -43,6 +43,11 @@ When `λ = 0`, the algorithm degenerates to pure Nearest Neighbour.
 When `λ > 0`, the algorithm favours cities that are *in front* over cities that are nearby but off-axis.
 
 ![image](graph_overview.jpeg)
+#How Tsp Path work :
+![image](imgs/tsp-path_1.png)
+![image](imgs/tsp-path_2.png)
+![image](imgs/tsp-path_3.png)
+![image](imgs/tsp-path_4.png)
 ### 2.2 Key Implementation Details
 
 | Component | Description |
