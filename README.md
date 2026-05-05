@@ -1,6 +1,6 @@
 # Ray TSP: A Directional Heuristic for the Travelling Salesman Problem
 
-> **Author:** [Your Name]
+> **Author:** MOHAMED EL-BOUANANI
 > **Status:** Experimental / Proof of Concept
 > **License:** MIT
 
